@@ -1,3 +1,5 @@
+#include <thread>
+#include <future>
 #include "Robot.hpp"
 
 Robot::Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigned int sensors, float fov) :
@@ -126,21 +128,22 @@ void Robot::updateMap(const Map &map) {
 
 void Robot::update(const Map &map) {
 
+    std::future<std::vector<sf::Vector2f>> futurePath;
     if (m_runPathFindingOnUpdate) {
-
+        futurePath = std::async(&LabyrinthMap::aStar, &this->m_map, m_pos, m_goal);
     }
 
     updatePos();
     updateMap(map);
 
-    if (m_runPathFindingOnUpdate) {
-        try {
+    if (futurePath.valid()) {
 
-            m_path = m_map.aStar(m_pos, m_goal);
-            m_runPathFindingOnUpdate = false;
-
-        } catch (std::invalid_argument &e) {
+        futurePath.wait();
+        m_path = futurePath.get();
+        if (m_path.empty()) {
             chooseGoal();
+        } else {
+            m_runPathFindingOnUpdate = false;
         }
     }
 }

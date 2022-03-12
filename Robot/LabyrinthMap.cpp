@@ -35,17 +35,17 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
     if (start.x < 0 || start.x >= m_size.x || start.y < 0 || start.y >= m_size.y ||
         end.x < 0 || end.x >= m_size.x || end.y < 0 || end.y >= m_size.y) {
 
-        throw std::invalid_argument("Start oder Endpunkt sind außerhalb der Karte");
+        return {};
     }
 
     if (!getCellAtReal(start.x, start.y)->isTraversable()
         || !getCellAtReal(end.x, end.y)->isTraversable()) {
 
-        throw std::invalid_argument("Start oder Endpunkt sind nicht Durchquerbar");
+        return {};
     }
 
     if (start == end) {
-        return {end};
+        return {start};
     }
 
     // --------- wichtige lambda Funktionen ------------
@@ -142,6 +142,7 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
         }
     }
     // Es wurde kein Pfad gefunden
+    return {};
     throw std::invalid_argument("Es gibt keinen Pfad vom Start zum Endpunkt");
 }
 
