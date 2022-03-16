@@ -29,6 +29,8 @@ Cell *LabyrinthMap::getCellAtReal(float x, float y) {
     return getCell(std::floor(x / m_cellSize.x), std::floor(y / m_cellSize.y));
 }
 
+
+// TODO: implement LPA* (lifelong planning A*)
 std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f end) {
 
     // ---------- Seltene Fälle ----------

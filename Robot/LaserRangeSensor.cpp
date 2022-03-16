@@ -49,7 +49,7 @@ float LaserRangeSensor::measureDistance(const std::vector<Wall> &walls) const {
 
         const float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
         const float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
-        if (t > 0 && t < 1 && u > 0) {
+        if (t > 0 && t < 1 && u >= 0) {
             const float x = x1 + t * (x2 - x1);
             const float y = y1 + t * (y2 - y1);
             const float d = std::pow(x - m_pos.x, 2) + std::pow(y - m_pos.y, 2);

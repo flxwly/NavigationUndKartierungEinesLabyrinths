@@ -22,7 +22,7 @@ int main() {
     Map map = Map({winWidth, winHeight}, {96, 54}, 0.3);
     srand(time(NULL));
 
-    const int updatesPerFrame = 40;
+    const int updatesPerFrame = 1;
 
     // run the program as long as the window is open
     while (window.isOpen())
