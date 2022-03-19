@@ -3,10 +3,12 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
 #include <cmath>
-#include "Robot/Cell.hpp"
-#include "Robot/LabyrinthMap.hpp"
+#include <chrono>
 #include "Robot/Robot.hpp"
 #include "Map.hpp"
+
+#define updateTime lastUpdateTime = std::chrono::high_resolution_clock::now();
+#define dispTime std::cout << "Took: " << (std::chrono::high_resolution_clock::now() - lastUpdateTime).count()  << std::endl;
 
 int main() {
 
@@ -24,9 +26,10 @@ int main() {
 
     const int updatesPerFrame = 1;
 
+    auto lastUpdateTime = std::chrono::high_resolution_clock::now();
+
     // run the program as long as the window is open
-    while (window.isOpen())
-    {
+    while (window.isOpen()) {
         window.clear({255, 255, 255});
 
         window.draw(map);
@@ -48,7 +51,6 @@ int main() {
             if (event.type == sf::Event::Closed)
                 window.close();
         }
-
         window.display();
     }
 

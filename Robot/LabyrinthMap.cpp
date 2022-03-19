@@ -1,3 +1,4 @@
+#include <chrono>
 #include "LabyrinthMap.hpp"
 
 LabyrinthMap::LabyrinthMap(sf::Vector2u size, sf::Vector2u cells) {
@@ -12,6 +13,29 @@ LabyrinthMap::LabyrinthMap(sf::Vector2u size, sf::Vector2u cells) {
             m_content.emplace_back(
                     sf::Vector2f(static_cast<float>(i) * m_cellSize.x, static_cast<float>(j) * m_cellSize.y),
                     m_cellSize, true);
+        }
+    }
+
+    //int validSteps[4][2] = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+    int validSteps[8][2] = {{0,  1},
+                            {0,  -1},
+                            {1,  0},
+                            {-1, 0},
+                            {1,  1},
+                            {1,  -1},
+                            {-1, 1},
+                            {-1, -1}};
+
+    for (int j = 0; j < cells.y; ++j) {
+        for (int i = 0; i < cells.x; ++i) {
+            Cell *cur = getCell(i, j);
+            for (auto step: validSteps) {
+                if (i + step[0] < 0 || i + step[0] >= cells.x || j + step[1] < 0 || j + step[1] >= cells.y) {
+                    continue;
+                }
+                cur->addPredecessor(getCell(i + step[0], j + step[1]));
+                cur->addSuccessor(getCell(i + step[0], j + step[1]));
+            }
         }
     }
 
@@ -32,6 +56,8 @@ Cell *LabyrinthMap::getCellAtReal(float x, float y) {
 
 // TODO: implement LPA* (lifelong planning A*)
 std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f end) {
+
+    std::cout << "Running pathfinding..." << std::endl;
 
     // ---------- Seltene Fälle ----------
     if (start.x < 0 || start.x >= m_size.x || start.y < 0 || start.y >= m_size.y ||
@@ -98,6 +124,21 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
             // Nachbar Nodes
             int v = u + e;
 
+            if (v == endIdx) {
+
+                std::vector<sf::Vector2f> path{};
+
+                auto time = std::chrono::high_resolution_clock::now();
+                // Den Pfad zurück verfolgen
+                for (unsigned int i = endIdx; i != startIdx;) {
+                    path.push_back(getCell(i)->getPosition() + getCell(i)->getSize() / 2.0f);
+                    i = p[i];
+                }
+                std::cout << "Traversing took: " << std::chrono::duration_cast<std::chrono::milliseconds>((std::chrono::high_resolution_clock::now() - time)).count() << std::endl;
+
+                return path;
+            }
+
             // Ouf of bounds check für eine 1-Dimensionale Reihung, die eine 2-Dimensionale Reigung darstellen soll
             if (((e == 1 || e == -width + 1 || e == width + 1) && v % width == 0)
                 || ((e == -1 || e == -width - 1 || e == width - 1) && u % width == 0)) {
@@ -105,6 +146,10 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
             }
 
             if (v < 0 || size <= v) {
+                continue;
+            }
+
+            if (!getCell(v)->isTraversable()) {
                 continue;
             }
 
@@ -121,22 +166,9 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
             }
 
 
-            if (d.at(v) > d.at(u) + heuristic(getCell(u)->getPosition(), getCell(v)->getPosition()) &&
-                getCell(v)->isTraversable()) {
+            if (d.at(v) > d.at(u) + heuristic(getCell(u)->getPosition(), getCell(v)->getPosition())) {
                 p.at(v) = u;
                 d.at(v) = d.at(u) + heuristic(getCell(u)->getPosition(), getCell(v)->getPosition());
-
-                if (v == endIdx) {
-
-                    std::vector<sf::Vector2f> path{};
-
-                    // Den Pfad zurück verfolgen
-                    for (unsigned int i = endIdx; i != startIdx;) {
-                        path.push_back(getCell(i)->getPosition() + getCell(i)->getSize() / 2.0f);
-                        i = p[i];
-                    }
-                    return path;
-                }
 
                 pq.push(std::make_tuple(d[v] + heuristic(getCell(v)->getPosition(), getCell(endIdx)->getPosition()),
                                         v));
