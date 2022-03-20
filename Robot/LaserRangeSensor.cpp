@@ -39,15 +39,15 @@ float LaserRangeSensor::measureDistance(const std::vector<Wall> &walls) const {
         // LRS
         const float x3 = this->m_pos.x;
         const float y3 = this->m_pos.y;
-        const float x4 = this->m_pos.x + this->m_dir.x;
-        const float y4 = this->m_pos.y + this->m_dir.y;
+        const float x4 = this->m_dir.x;
+        const float y4 = this->m_dir.y;
 
-        const float den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        const float den = (x1 - x2) * -y4 - (y1 - y2) * -x4;
         if (den == 0) {
             continue;
         }
 
-        const float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+        const float t = ((x1 - x3) * -y4 - (y1 - y3) * -x4) / den;
         const float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
         if (t > 0 && t < 1 && u >= 0) {
             const float x = x1 + t * (x2 - x1);
