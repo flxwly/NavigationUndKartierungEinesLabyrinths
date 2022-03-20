@@ -130,7 +130,10 @@ void Robot::update(const Map &map) {
 
     std::future<std::vector<sf::Vector2f>> futurePath;
     if (m_runPathFindingOnUpdate) {
+        auto time = std::chrono::high_resolution_clock::now();
         futurePath = std::async(&LabyrinthMap::aStar, &this->m_map, m_pos, m_goal);
+        futurePath.wait();
+        std::cout << "Path finding took: " << std::chrono::duration_cast<std::chrono::milliseconds>((std::chrono::high_resolution_clock::now() - time)).count() << std::endl;
     }
 
     updatePos();
