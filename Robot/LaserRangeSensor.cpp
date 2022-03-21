@@ -23,43 +23,40 @@ sf::Vector2f LaserRangeSensor::getPos() const {
 }
 
 float LaserRangeSensor::measureDistance(const std::vector<Wall> &walls) const {
-
-    // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
-
     float record = INFINITY;
 
+    // Der Sensor mit der Position als m_pos und Richtung als m_dir
+    const float x2 = this->m_pos.x;
+    const float y2 = this->m_pos.y;
+    const float x3 = this->m_dir.x;
+    const float y3 = this->m_dir.y;
+
     for (auto wall: walls) {
+        // Eine Wand mit Punkt A und Punkt B
+        const float x0 = wall.getA().x;
+        const float y0 = wall.getA().y;
+        const float x1 = wall.getB().x;
+        const float y1 = wall.getB().y;
 
-        // Wand
-        const float x1 = wall.getA().x;
-        const float y1 = wall.getA().y;
-        const float x2 = wall.getB().x;
-        const float y2 = wall.getB().y;
-
-        // LRS
-        const float x3 = this->m_pos.x;
-        const float y3 = this->m_pos.y;
-        const float x4 = this->m_dir.x;
-        const float y4 = this->m_dir.y;
-
-        const float den = (x1 - x2) * -y4 - (y1 - y2) * -x4;
+        // Weil nicht durch 0 geteilt werden kann und der Nenner für s und t gleich ist.
+        const float den = y3 * (x1 - x0) - x3 * (y1 - y0);
         if (den == 0) {
             continue;
         }
 
-        const float t = ((x1 - x3) * -y4 - (y1 - y3) * -x4) / den;
-        const float u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
-        if (t > 0 && t < 1 && u >= 0) {
-            const float x = x1 + t * (x2 - x1);
-            const float y = y1 + t * (y2 - y1);
-            const float d = std::pow(x - m_pos.x, 2) + std::pow(y - m_pos.y, 2);
+        const float s = (x3 * (y0 - y2) - y3 * (x0 - x2)) / den;
+        const float t = ((y1 - y0) * (x2 - x0) - (y2 - y0) * (x1 - x0)) / den;
+        if (0 <= s && s <= 1 && 0 <= t) {
+            const float x = x2 + t * x3;
+            const float y = y2 + t * y3;
+            const float d = (x - x2) * (x - x2) + (y - y2) * (y - y2);
             if (d < record) {
                 record = d;
             }
         }
     }
-
     return std::sqrt(record);
 }
+
 
 

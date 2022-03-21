@@ -15,30 +15,6 @@ LabyrinthMap::LabyrinthMap(sf::Vector2u size, sf::Vector2u cells) {
                     m_cellSize, true);
         }
     }
-
-    //int validSteps[4][2] = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
-    int validSteps[8][2] = {{0,  1},
-                            {0,  -1},
-                            {1,  0},
-                            {-1, 0},
-                            {1,  1},
-                            {1,  -1},
-                            {-1, 1},
-                            {-1, -1}};
-
-    for (int j = 0; j < cells.y; ++j) {
-        for (int i = 0; i < cells.x; ++i) {
-            Cell *cur = getCell(i, j);
-            for (auto step: validSteps) {
-                if (i + step[0] < 0 || i + step[0] >= cells.x || j + step[1] < 0 || j + step[1] >= cells.y) {
-                    continue;
-                }
-                cur->addPredecessor(getCell(i + step[0], j + step[1]));
-                cur->addSuccessor(getCell(i + step[0], j + step[1]));
-            }
-        }
-    }
-
 }
 
 Cell *LabyrinthMap::getCell(unsigned int index) {
@@ -56,8 +32,6 @@ Cell *LabyrinthMap::getCellAtReal(float x, float y) {
 
 // TODO: implement LPA* (lifelong planning A*)
 std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f end) {
-
-    std::cout << "Running pathfinding..." << std::endl;
 
     // ---------- Seltene Fälle ----------
     if (start.x < 0 || start.x >= m_size.x || start.y < 0 || start.y >= m_size.y ||
@@ -82,11 +56,11 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
     };
 
     auto heuristic = [](sf::Vector2f a, sf::Vector2f b) {
-        return static_cast<float>(std::sqrt(std::pow(a.x - b.x, 2) + std::pow(a.y - b.y, 2)));
+        return std::sqrt(std::pow(a.x - b.x, 2) + std::pow(a.y - b.y, 2));
     };
 
     // Eine Node ist ein Tuple mit f-Kosten, vorherige Node;
-    auto comp = [](const std::tuple<float, int> &n1, const std::tuple<float, int> &n2) {
+    auto comp = [](const std::tuple<double, int> &n1, const std::tuple<double, int> &n2) {
         return std::get<0>(n1) > std::get<0>(n2);
     };
 
@@ -107,9 +81,9 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
                                      static_cast<unsigned int> (end.y / m_cellSize.y)},
                                     width);
 
-    std::priority_queue<std::tuple<float, int>, std::vector<std::tuple<float, int>>, decltype(comp)> pq(comp);
+    std::priority_queue<std::tuple<double, int>, std::vector<std::tuple<double, int>>, decltype(comp)> pq(comp);
     std::vector<int> p(size); // prev
-    std::vector<float> d(size, INT_MAX); // heuristic (filled with max distance)
+    std::vector<double> d(size, INT_MAX); // heuristic (filled with max distance)
 
     d[startIdx] = 0;
     pq.push(std::make_tuple(heuristic(start, end), startIdx));
@@ -123,21 +97,6 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
 
             // Nachbar Nodes
             int v = u + e;
-
-            if (v == endIdx) {
-
-                std::vector<sf::Vector2f> path{};
-
-                auto time = std::chrono::high_resolution_clock::now();
-                // Den Pfad zurück verfolgen
-                for (unsigned int i = endIdx; i != startIdx;) {
-                    path.push_back(getCell(i)->getPosition() + getCell(i)->getSize() / 2.0f);
-                    i = p[i];
-                }
-                std::cout << "Traversing took: " << std::chrono::duration_cast<std::chrono::milliseconds>((std::chrono::high_resolution_clock::now() - time)).count() << std::endl;
-
-                return path;
-            }
 
             // Ouf of bounds check für eine 1-Dimensionale Reihung, die eine 2-Dimensionale Reigung darstellen soll
             if (((e == 1 || e == -width + 1 || e == width + 1) && v % width == 0)
@@ -173,11 +132,21 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
                 pq.push(std::make_tuple(d[v] + heuristic(getCell(v)->getPosition(), getCell(endIdx)->getPosition()),
                                         v));
             }
+
+            if (v == endIdx) {
+
+                std::vector<sf::Vector2f> path{};
+                // Den Pfad zurück verfolgen
+                for (unsigned int i = endIdx; i != startIdx;) {
+                    path.push_back(getCell(i)->getPosition() + getCell(i)->getSize() / 2.0f);
+                    i = p[i];
+                }
+                return path;
+            }
         }
     }
     // Es wurde kein Pfad gefunden
     return {};
-    throw std::invalid_argument("Es gibt keinen Pfad vom Start zum Endpunkt");
 }
 
 

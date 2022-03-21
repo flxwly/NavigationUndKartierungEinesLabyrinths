@@ -18,5 +18,5 @@ add_executable(NavigationUndKartierungEinesLabyrinths
         Robot/Robot.cpp Robot/Robot.hpp
         Robot/LaserRangeSensor.cpp Robot/LaserRangeSensor.hpp
         Wall.cpp Wall.hpp
-        Map.cpp Map.hpp Robot/LPA.cpp Robot/LPA.h Robot/Queue.cpp Robot/Queue.h)
+        Map.cpp Map.hpp)
 target_link_libraries(NavigationUndKartierungEinesLabyrinths sfml-graphics)

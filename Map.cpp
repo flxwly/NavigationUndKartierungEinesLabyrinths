@@ -1,6 +1,6 @@
 #include "Map.hpp"
 
-Map::Map(sf::Vector2u size, sf::Vector2u wallCount, float wallFrequency) {
+Map::Map(sf::Vector2u size, sf::Vector2u wallCount, unsigned int randomWalls, float wallFrequency) {
 
     m_size = size;
 
@@ -33,6 +33,18 @@ Map::Map(sf::Vector2u size, sf::Vector2u wallCount, float wallFrequency) {
                                              static_cast<float> (j) * cellHeight + cellHeight);
             }
         }
+    }
+
+    // random Walls
+    for (int i = 0; i < randomWalls; ++i) {
+
+        const float x1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.x;
+        const float y1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.y;
+
+        const float x2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.x;
+        const float y2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.y;
+
+        this->m_content.emplace_back(x1, y1, x2, y2);
     }
 
 

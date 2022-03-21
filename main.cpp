@@ -5,26 +5,23 @@
 #include <cmath>
 #include <chrono>
 #include "Robot/Robot.hpp"
-#include "Map.hpp"
-
-#define updateTime lastUpdateTime = std::chrono::high_resolution_clock::now();
-#define dispTime std::cout << "Took: " << (std::chrono::high_resolution_clock::now() - lastUpdateTime).count()  << std::endl;
 
 int main() {
 
-    const sf::Vector2u winSize = {1920, 1080};
-    const sf::Vector2u cells = {192 * 2, 108 * 2};
-    const unsigned int winWidth = 1920;
-    const unsigned int winHeight = 1080;
+    const sf::Vector2u winSize = {1080, 720};
+    const sf::Vector2u cells = {192, 108};
+    const unsigned int winWidth = 1080;
+    const unsigned int winHeight = 720;
 
     sf::RenderWindow window(sf::VideoMode(winWidth, winHeight), "Navigation und Kartierung eines Labyrinths.");
-    window.setVerticalSyncEnabled(true);
+    //window.setFramerateLimit(1);
+    //window.setVerticalSyncEnabled(true);
 
-    Robot robot = Robot({winWidth / 2, winHeight / 2}, winSize, cells, 10, M_PI/2);
-    Map map = Map({winWidth, winHeight}, {96, 54}, 0.3);
+    Robot robot = Robot({winWidth / 2, winHeight / 2}, winSize, cells, 20, M_PI/3);
+    Map map = Map({winWidth, winHeight}, {100, 100}, 5, 0.3);
     srand(time(NULL));
 
-    const int updatesPerFrame = 1;
+    const int updatesPerFrame = 10;
 
     auto lastUpdateTime = std::chrono::high_resolution_clock::now();
 

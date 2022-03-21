@@ -9,7 +9,7 @@
 #include "LaserRangeSensor.hpp"
 #include "../Map.hpp"
 
-#define MAX_MEASURE_DIST 400
+#define MAX_MEASURE_DIST INFINITY
 
 class Robot : public sf::Drawable {
 public:

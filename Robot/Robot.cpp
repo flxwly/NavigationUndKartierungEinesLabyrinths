@@ -19,6 +19,7 @@ Robot::Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigne
     m_shape.setRadius(radius);
     m_shape.setFillColor({0, 0, 255});
     m_shape.setOutlineColor({0, 0, 0});
+    m_shape.setPosition(0, 0);
     m_shape.setOrigin({radius / 2, radius / 2});
     m_shape.setPosition(m_pos);
 
@@ -80,7 +81,7 @@ void Robot::updatePos() {
         const float angle = std::acos(dot);
 
         rotate(angle);
-        move(1);
+        move(0.25);
     } else {
         if (!m_map.getCellAtReal(m_pos.x, m_pos.y)->isTraversable()) {
             move(1);
@@ -97,6 +98,7 @@ void Robot::updateMap(const Map &map) {
     std::vector<Cell *> changedCells;
     std::vector<Wall> walls = map.getWalls();
 
+    sf::Vertex line[2];
     for (auto sensor: m_sensors) {
         const float d = sensor.measureDistance(walls);
         if (d < MAX_MEASURE_DIST) {
@@ -108,9 +110,11 @@ void Robot::updateMap(const Map &map) {
                 continue;
             }
 
-            if (m_map.getCellAtReal(collision.x, collision.y)->isTraversable()) {
-                changedCells.push_back(m_map.getCellAtReal(collision.x, collision.y));
-                m_map.getCellAtReal(collision.x, collision.y)->makeNonTraversable();
+            Cell *curCell = m_map.getCellAtReal(collision.x, collision.y);
+
+            if (curCell->isTraversable()) {
+                curCell->makeNonTraversable();
+                changedCells.push_back(curCell);
             }
         }
         for (auto changedCell: changedCells) {
@@ -118,7 +122,7 @@ void Robot::updateMap(const Map &map) {
                 if (std::abs(changedCell->getPosition().x - p.x) < m_map.getCellSize().x &&
                     std::abs(changedCell->getPosition().y - p.y) < m_map.getCellSize().y) {
                     m_runPathFindingOnUpdate = true;
-                    break;
+                    return;
                 }
             }
         }
@@ -130,10 +134,8 @@ void Robot::update(const Map &map) {
 
     std::future<std::vector<sf::Vector2f>> futurePath;
     if (m_runPathFindingOnUpdate) {
-        auto time = std::chrono::high_resolution_clock::now();
         futurePath = std::async(&LabyrinthMap::aStar, &this->m_map, m_pos, m_goal);
         futurePath.wait();
-        std::cout << "Path finding took: " << std::chrono::duration_cast<std::chrono::milliseconds>((std::chrono::high_resolution_clock::now() - time)).count() << std::endl;
     }
 
     updatePos();
@@ -181,7 +183,7 @@ void Robot::draw(sf::RenderTarget &target, sf::RenderStates states) const {
     sf::Vertex lines[m_sensors.size() * 2];
     for (unsigned int i = 0; i < m_sensors.size(); i += 1) {
         lines[2 * i] = {m_sensors.at(i).getPos(), sf::Color::Red};
-        lines[2 * i + 1] = {m_sensors.at(i).getPos() + m_sensors.at(i).getDir(), sf::Color::Green};
+        lines[2 * i + 1] = {m_sensors.at(i).getPos() + m_sensors.at(i).getDir() * 5.0f, sf::Color::Green};
     }
     target.draw(lines, m_sensors.size() * 2, sf::Lines);
 
