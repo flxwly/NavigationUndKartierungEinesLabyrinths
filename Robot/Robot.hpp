@@ -17,12 +17,18 @@ public:
     Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigned int sensors, float fov);
 
     void move(float factor);
+
     void rotate(float angle);
 
-    void update(const Map& map);
+    void update(const Map &map);
+
     sf::Vector2f getPos();
+
     void setPos(sf::Vector2f pos);
+
     sf::Vector2f getDir();
+
+    int calculateScore(LabyrinthMap &completeMap);
 
 private:
 
@@ -35,13 +41,17 @@ private:
     std::vector<sf::Vector2f> m_path;
 
     void updateSensorPositions();
+
     void updateSensorOrientations();
-    void updateMap(const Map& map);
+
+    void updateMap(const Map &map);
+
     void updatePos();
 
     void chooseGoal();
 
     sf::CircleShape m_shape;
+
     void draw(sf::RenderTarget &target, sf::RenderStates states) const override;
 
 };

@@ -10,7 +10,7 @@
 
 class Map : public sf::Drawable{
 public:
-    Map(sf::Vector2u size, sf::Vector2u wallCount, unsigned int randomWalls, float wallFrequency);
+    Map(sf::Vector2u size, sf::Vector2u wallCount, unsigned int randomWalls, unsigned int randomBoxes, float wallFrequency);
 
     std::vector<Wall> getWalls() const;
     sf::Vector2u getSize() const;

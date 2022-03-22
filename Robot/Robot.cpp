@@ -48,8 +48,8 @@ void Robot::updateSensorOrientations() {
 
 void Robot::updatePos() {
 
-    if (std::pow(m_pos.x - m_goal.x, 2) +
-        std::pow(m_pos.y - m_goal.y, 2) < 25) {
+    if (std::pow(m_pos.x - m_goal.x, 2) + std::pow(m_pos.y - m_goal.y, 2) < 25 ||
+        !m_map.getCellAtReal(m_goal.x, m_goal.y)->isReachable()) {
         m_runPathFindingOnUpdate = true;
         chooseGoal();
         return;
@@ -117,16 +117,20 @@ void Robot::updateMap(const Map &map) {
                 changedCells.push_back(curCell);
             }
         }
-        for (auto changedCell: changedCells) {
-            for (auto p: m_path) {
-                if (std::abs(changedCell->getPosition().x - p.x) < m_map.getCellSize().x &&
-                    std::abs(changedCell->getPosition().y - p.y) < m_map.getCellSize().y) {
-                    m_runPathFindingOnUpdate = true;
-                    return;
-                }
+    }
+
+    if (!changedCells.empty()) {
+        m_map.markNonReachableCells(m_pos);
+    }
+
+    for (auto changedCell: changedCells) {
+        for (auto p: m_path) {
+            if (std::abs(changedCell->getPosition().x - p.x) < m_map.getCellSize().x &&
+                std::abs(changedCell->getPosition().y - p.y) < m_map.getCellSize().y) {
+                m_runPathFindingOnUpdate = true;
+                return;
             }
         }
-
     }
 }
 
@@ -160,13 +164,25 @@ void Robot::chooseGoal() {
 };
 
 void Robot::move(float factor) {
-    m_pos += m_dir * factor;
+    auto newPos = m_pos + m_dir * factor;
+    if (newPos.x < 0 || newPos.x >= m_map.getCellSize().x * static_cast<float>(m_map.getSize().x) ||
+        newPos.y < 0 || newPos.y >= m_map.getCellSize().y * static_cast<float>(m_map.getSize().y)) {
+        return;
+    }
+
+    if (!m_map.getCellAtReal(newPos.x, newPos.y)->isTraversable()) {
+        m_runPathFindingOnUpdate = true;
+        return;
+    }
+
+    m_pos = newPos;
     updateSensorPositions();
 }
 
 void Robot::setPos(sf::Vector2f pos) {
     m_pos = pos;
     m_runPathFindingOnUpdate = true;
+    m_map.markNonReachableCells(m_pos);
     updateSensorPositions();
 }
 
@@ -192,4 +208,18 @@ void Robot::draw(sf::RenderTarget &target, sf::RenderStates states) const {
         path[i] = {m_path.at(i), sf::Color::Green};
     }
     target.draw(path, m_path.size(), sf::LineStrip);
+}
+
+int Robot::calculateScore(LabyrinthMap &completeMap) {
+    const unsigned int size = std::min(m_map.getCellCount().x * m_map.getCellCount().y,
+                                       completeMap.getCellCount().x * completeMap.getCellCount().y);
+
+    int score = 0;
+    for (int i = 0; i < size; ++i) {
+        if (m_map.getCell(i)->isReachable() == completeMap.getCell(i)->isReachable()) {
+            score += 1;
+        }
+    }
+
+    return score;
 }

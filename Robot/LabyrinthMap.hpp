@@ -23,9 +23,12 @@ public:
 
     sf::Vector2u getSize() { return m_size; };
 
+    sf::Vector2u getCellCount() { return m_cells; };
+
     sf::Vector2f getCellSize() { return m_cellSize; };
 
     std::vector<sf::Vector2f> aStar(sf::Vector2f start, sf::Vector2f end);
+    void markNonReachableCells(sf::Vector2f pos);
 
 private:
     sf::Vector2u m_size, m_cells;
@@ -35,7 +38,7 @@ private:
 
     void draw(sf::RenderTarget &target, sf::RenderStates states) const override {
         for (const auto &cell: this->m_content) {
-            if (!cell.isTraversable())
+            if (!cell.isTraversable() || !cell.isReachable())
                 target.draw(cell, states);
         }
     };

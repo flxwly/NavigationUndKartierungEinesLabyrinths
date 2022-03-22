@@ -1,13 +1,12 @@
 #include "Map.hpp"
 
-Map::Map(sf::Vector2u size, sf::Vector2u wallCount, unsigned int randomWalls, float wallFrequency) {
+Map::Map(sf::Vector2u size, sf::Vector2u wallCount, unsigned int randomWalls, unsigned int randomBoxes,
+         float wallFrequency) {
 
     m_size = size;
 
     const float cellWidth = static_cast<float> (size.x) / static_cast<float> (wallCount.x);
     const float cellHeight = static_cast<float> (size.y) / static_cast<float> (wallCount.y);
-
-    srand(time(0));
 
     // horizontal walls
     for (unsigned int i = 0; i < wallCount.x; i++) {
@@ -47,6 +46,20 @@ Map::Map(sf::Vector2u size, sf::Vector2u wallCount, unsigned int randomWalls, fl
         this->m_content.emplace_back(x1, y1, x2, y2);
     }
 
+    // random Boxes
+    for (int i = 0; i < randomBoxes; ++i) {
+        const float x1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.x;
+        const float y1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.y;
+
+        const float x2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.x;
+        const float y2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) * size.y;
+
+        m_content.emplace_back(x1, y1, x1, y2);
+        m_content.emplace_back(x1, y1, x2, y1);
+        m_content.emplace_back(x2, y1, x2, y2);
+        m_content.emplace_back(x1, y2, x2, y2);
+
+    }
 
 }
 

@@ -1,4 +1,5 @@
 #include <chrono>
+#include <list>
 #include "LabyrinthMap.hpp"
 
 LabyrinthMap::LabyrinthMap(sf::Vector2u size, sf::Vector2u cells) {
@@ -30,7 +31,6 @@ Cell *LabyrinthMap::getCellAtReal(float x, float y) {
 }
 
 
-// TODO: implement LPA* (lifelong planning A*)
 std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f end) {
 
     // ---------- Seltene Fälle ----------
@@ -147,6 +147,56 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
     }
     // Es wurde kein Pfad gefunden
     return {};
+}
+
+void LabyrinthMap::markNonReachableCells(sf::Vector2f pos) {
+
+    // ----------- Initialisierung --------------
+    const unsigned int size = m_cells.x * m_cells.y;
+    const int width = static_cast<int> (m_cells.x);
+
+    int startIdx = std::floor(pos.x / m_cellSize.x) + std::floor(pos.y / m_cellSize.y) * m_cells.x;
+    if (startIdx < 0 || size <= startIdx) {
+        return;
+    }
+
+    std::list<int> queue = {startIdx};
+
+    std::vector<int> validSteps = {width, 1, -1, -width};
+
+    while (!queue.empty()) {
+        int u = queue.front();
+        queue.pop_front();
+
+        for (auto e : validSteps) {
+            int v = u + e;
+
+            // Ouf of bounds check für eine 1-Dimensionale Reihung, die eine 2-Dimensionale Reigung darstellen soll
+            if ((e == 1 && v % width == 0) || (e == -1 && u % width == 0)) {
+                continue;
+            }
+
+            if (v < 0 || size <= v) {
+                continue;
+            }
+
+            if (getCell(v)->isFlagged() || !getCell(v)->isTraversable()) {
+                continue;
+            }
+
+            getCell(v)->flag();
+            queue.push_back(v);
+        }
+    }
+
+    for (auto &cell : m_content) {
+        if (cell.isFlagged()) {
+            cell.makeReachable();
+            cell.deFlag();
+        } else {
+            cell.makeNonReachable();
+        }
+    }
 }
 
 
