@@ -1,5 +1,3 @@
-#include <chrono>
-#include <list>
 #include "LabyrinthMap.hpp"
 
 LabyrinthMap::LabyrinthMap(sf::Vector2u size, sf::Vector2u cells) {
@@ -9,21 +7,18 @@ LabyrinthMap::LabyrinthMap(sf::Vector2u size, sf::Vector2u cells) {
     m_cellSize = sf::Vector2f(static_cast<float>(size.x) / static_cast<float>(cells.x),
                               static_cast<float>(size.y) / static_cast<float>(cells.y));
 
-    for (int j = 0; j < cells.y; ++j) {
-        for (int i = 0; i < cells.x; ++i) {
-            m_content.emplace_back(
+    m_content = std::vector<std::vector<Cell>>(cells.x);
+    for (int i = 0; i < cells.x; ++i) {
+        for (int j = 0; j < cells.y; ++j) {
+            m_content.at(i).emplace_back(
                     sf::Vector2f(static_cast<float>(i) * m_cellSize.x, static_cast<float>(j) * m_cellSize.y),
                     m_cellSize, true);
         }
     }
 }
 
-Cell *LabyrinthMap::getCell(unsigned int index) {
-    return &m_content.at(index);
-}
-
 Cell *LabyrinthMap::getCell(unsigned int x, unsigned int y) {
-    return getCell(x + y * m_cells.x);
+    return &m_content.at(x).at(y);
 }
 
 Cell *LabyrinthMap::getCellAtReal(float x, float y) {
@@ -36,7 +31,6 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
     // ---------- Seltene Fälle ----------
     if (start.x < 0 || start.x >= m_size.x || start.y < 0 || start.y >= m_size.y ||
         end.x < 0 || end.x >= m_size.x || end.y < 0 || end.y >= m_size.y) {
-
         return {};
     }
 
@@ -51,85 +45,73 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
     }
 
     // --------- wichtige lambda Funktionen ------------
-    auto idx = [](sf::Vector2u p, unsigned int w) {
-        return p.x + p.y * w;
-    };
-
     auto heuristic = [](sf::Vector2f a, sf::Vector2f b) {
         return std::sqrt(std::pow(a.x - b.x, 2) + std::pow(a.y - b.y, 2));
     };
 
     // Eine Node ist ein Tuple mit f-Kosten, vorherige Node;
-    auto comp = [](const std::tuple<double, int> &n1, const std::tuple<double, int> &n2) {
+    auto comp = [](const std::tuple<double, sf::Vector2i> &n1, const std::tuple<double, sf::Vector2i> &n2) {
         return std::get<0>(n1) > std::get<0>(n2);
     };
 
 
     // ----------- Initialisierung --------------
-    const unsigned int size = m_cells.x * m_cells.y;
-    const int width = static_cast<int> (m_cells.x);
 
-    std::vector<int> validSteps = {
-            width - 1, width, width + 1,
-            -1, 1,
-            -width - 1, -width, -width + 1};
+    std::array<sf::Vector2i, 8> validSteps = {
+            sf::Vector2i(-1, -1), sf::Vector2i(1, 1),
+            sf::Vector2i(-1, 1), sf::Vector2i(1, -1),
+            sf::Vector2i(1, 0), sf::Vector2i(-1, 0),
+            sf::Vector2i(0, 1), sf::Vector2i(0, -1)};
 
-    const unsigned int startIdx = idx({static_cast<unsigned int> (start.x / m_cellSize.x),
-                                       static_cast<unsigned int> (start.y / m_cellSize.y)},
-                                      width);
-    const unsigned int endIdx = idx({static_cast<unsigned int> (end.x / m_cellSize.x),
-                                     static_cast<unsigned int> (end.y / m_cellSize.y)},
-                                    width);
+    const sf::Vector2i startIdx = {static_cast<int> (start.x / m_cellSize.x),
+                                   static_cast<int> (start.y / m_cellSize.y)};
+    const sf::Vector2i endIdx = {static_cast<int> (end.x / m_cellSize.x),
+                                 static_cast<int> (end.y / m_cellSize.y)};
 
-    std::priority_queue<std::tuple<double, int>, std::vector<std::tuple<double, int>>, decltype(comp)> pq(comp);
-    std::vector<int> p(size); // prev
-    std::vector<double> d(size, INT_MAX); // heuristic (filled with max distance)
+    std::priority_queue<std::tuple<double, sf::Vector2i>, std::vector<std::tuple<double, sf::Vector2i>>, decltype(comp)> pq(
+            comp);
+    std::vector<std::vector<sf::Vector2i>> p(m_cells.x, std::vector<sf::Vector2i>(m_cells.y));
+    std::vector<std::vector<double>> d(m_cells.x, std::vector<double>(m_cells.y, INT_MAX));
 
-    d[startIdx] = 0;
+    d.at(startIdx.x).at(startIdx.y) = 0;
     pq.push(std::make_tuple(heuristic(start, end), startIdx));
 
     while (!pq.empty()) {
 
-        int u = std::get<1>(pq.top());
+        sf::Vector2i u = std::get<1>(pq.top());
         pq.pop();
 
         for (auto e: validSteps) {
 
             // Nachbar Nodes
-            int v = u + e;
+            sf::Vector2i v = u + e;
 
             // Ouf of bounds check für eine 1-Dimensionale Reihung, die eine 2-Dimensionale Reigung darstellen soll
-            if (((e == 1 || e == -width + 1 || e == width + 1) && v % width == 0)
-                || ((e == -1 || e == -width - 1 || e == width - 1) && u % width == 0)) {
+            if (v.x < 0 || v.y < 0 || v.x >= m_cells.x || v.y >= m_cells.y) {
                 continue;
             }
 
-            if (v < 0 || size <= v) {
-                continue;
-            }
-
-            if (!getCell(v)->isTraversable()) {
+            if (!getCell(v.x, v.y)->isTraversable()) {
                 continue;
             }
 
             // Bei diagonalen sollen jeweils angrenzende keine Wände sein
-            if (std::abs(e + width) == 1 && !getCell(u - width)->isTraversable()) {
-                continue;
-            } else if (std::abs(e - width) == 1 && !getCell(u + width)->isTraversable()) {
-                continue;
-            }
-            if (std::abs(e + 1) == width && !getCell(u - 1)->isTraversable()) {
-                continue;
-            } else if (std::abs(e - 1) == width && !getCell(u + 1)->isTraversable()) {
+            if ((std::abs(e.x) == 1 && std::abs(e.y) == 1) &&
+                !(getCell(u.x + e.x, u.y)->isTraversable() && getCell(u.x, e.y + u.y)->isTraversable())) {
                 continue;
             }
 
 
-            if (d.at(v) > d.at(u) + heuristic(getCell(u)->getPosition(), getCell(v)->getPosition())) {
-                p.at(v) = u;
-                d.at(v) = d.at(u) + heuristic(getCell(u)->getPosition(), getCell(v)->getPosition());
+            if (d.at(v.x).at(v.y) > d.at(u.x).at(u.y) + heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition())) {
+                p.at(v.x).at(v.y) = u;
 
-                pq.push(std::make_tuple(d[v] + heuristic(getCell(v)->getPosition(), getCell(endIdx)->getPosition()),
+                if (getCell(u.x, u.y)->isChecked()) {
+                    d.at(v.x).at(v.y) = d.at(u.x).at(u.y) + 2 * heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition());
+                } else {
+                    d.at(v.x).at(v.y) = d.at(u.x).at(u.y) + heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition());
+                }
+
+                pq.push(std::make_tuple(d.at(v.x).at(v.y) + heuristic(getCell(v.x, v.y)->getPosition(), getCell(endIdx.x, endIdx.y)->getPosition()),
                                         v));
             }
 
@@ -137,9 +119,9 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
 
                 std::vector<sf::Vector2f> path{};
                 // Den Pfad zurück verfolgen
-                for (unsigned int i = endIdx; i != startIdx;) {
-                    path.push_back(getCell(i)->getPosition() + getCell(i)->getSize() / 2.0f);
-                    i = p[i];
+                for (sf::Vector2i i = endIdx; i != startIdx;) {
+                    path.push_back(getCell(i.x, i.y)->getPosition() + getCell(i.x, i.y)->getSize() / 2.0f);
+                    i = p.at(i.x).at(i.y);
                 }
                 return path;
             }
@@ -152,49 +134,49 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
 void LabyrinthMap::markNonReachableCells(sf::Vector2f pos) {
 
     // ----------- Initialisierung --------------
-    const unsigned int size = m_cells.x * m_cells.y;
-    const int width = static_cast<int> (m_cells.x);
 
-    int startIdx = std::floor(pos.x / m_cellSize.x) + std::floor(pos.y / m_cellSize.y) * m_cells.x;
-    if (startIdx < 0 || size <= startIdx) {
+    sf::Vector2i startIdx = {static_cast<int>(std::floor(pos.x / m_cellSize.x)),
+                             static_cast<int>(std::floor(pos.y / m_cellSize.y))};
+    if (startIdx.x < 0 || m_cells.x <= startIdx.x || startIdx.y < 0 || m_cells.y <= startIdx.y) {
         return;
     }
 
-    std::list<int> queue = {startIdx};
+    std::list<sf::Vector2i> queue = {startIdx};
 
-    std::vector<int> validSteps = {width, 1, -1, -width};
+    std::array<sf::Vector2i, 4> validSteps = {sf::Vector2i(-1, 0),
+                                              sf::Vector2i(1, 0),
+                                              sf::Vector2i(0, 1),
+                                              sf::Vector2i(0, -1)};
 
     while (!queue.empty()) {
-        int u = queue.front();
+        sf::Vector2i u = queue.front();
         queue.pop_front();
 
-        for (auto e : validSteps) {
-            int v = u + e;
+        for (auto e: validSteps) {
+            sf::Vector2i v = u + e;
 
             // Ouf of bounds check für eine 1-Dimensionale Reihung, die eine 2-Dimensionale Reigung darstellen soll
-            if ((e == 1 && v % width == 0) || (e == -1 && u % width == 0)) {
+            if (v.x < 0 || m_cells.x <= v.x || v.y < 0 || m_cells.y <= v.y) {
                 continue;
             }
 
-            if (v < 0 || size <= v) {
+            if (getCell(v.x, v.y)->isFlagged() || !getCell(v.x, v.y)->isTraversable()) {
                 continue;
             }
 
-            if (getCell(v)->isFlagged() || !getCell(v)->isTraversable()) {
-                continue;
-            }
-
-            getCell(v)->flag();
+            getCell(v.x, v.y)->flag();
             queue.push_back(v);
         }
     }
 
-    for (auto &cell : m_content) {
-        if (cell.isFlagged()) {
-            cell.makeReachable();
-            cell.deFlag();
-        } else {
-            cell.makeNonReachable();
+    for (auto &row: m_content) {
+        for (auto &cell: row) {
+            if (cell.isFlagged()) {
+                cell.makeReachable();
+                cell.deFlag();
+            } else {
+                cell.makeNonReachable();
+            }
         }
     }
 }

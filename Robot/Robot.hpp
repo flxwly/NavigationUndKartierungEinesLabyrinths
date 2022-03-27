@@ -1,10 +1,9 @@
 #ifndef NAVIGATIONUNDKARTIERUNGEINESLABYRINTHS_ROBOT_HPP
 #define NAVIGATIONUNDKARTIERUNGEINESLABYRINTHS_ROBOT_HPP
 
-#define _USE_MATH_DEFINES
-
 #include <SFML/Graphics.hpp>
 #include <cmath>
+#include <random>
 #include "LabyrinthMap.hpp"
 #include "LaserRangeSensor.hpp"
 #include "../Map.hpp"
@@ -14,7 +13,7 @@
 class Robot : public sf::Drawable {
 public:
 
-    Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigned int sensors, float fov);
+    Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigned int sensors, float fov, int movementType = 0);
 
     void move(float factor);
 
@@ -28,16 +27,17 @@ public:
 
     sf::Vector2f getDir();
 
-    int calculateScore(LabyrinthMap &completeMap);
+    double calculateScore(LabyrinthMap &completeMap);
 
 private:
 
+    const int m_movementType = 0;
     sf::Vector2f m_pos, m_dir;
     LabyrinthMap m_map;
-    std::vector<LaserRangeSensor> m_sensors;
 
+    std::vector<LaserRangeSensor> m_sensors;
     sf::Vector2f m_goal;
-    bool m_runPathFindingOnUpdate = true;
+    bool m_runPathFindingOnUpdate = false;
     std::vector<sf::Vector2f> m_path;
 
     void updateSensorPositions();
@@ -46,11 +46,18 @@ private:
 
     void updateMap(const Map &map);
 
-    void updatePos();
+    void updatePos(const Map &map);
 
-    void chooseGoal();
+    void chooseRandomGoal();
+    void chooseSmartGoal();
 
-    sf::CircleShape m_shape;
+    // Behavior
+    void randomMovement(const Map &map);
+    void randomPathMovement(const Map &map);
+    void chosenPathMovement(const Map &map);
+
+
+    sf::RectangleShape m_shape;
 
     void draw(sf::RenderTarget &target, sf::RenderStates states) const override;
 

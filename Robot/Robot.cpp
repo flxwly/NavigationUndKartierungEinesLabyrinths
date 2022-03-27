@@ -2,8 +2,9 @@
 #include <future>
 #include "Robot.hpp"
 
-Robot::Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigned int sensors, float fov) :
-        m_map(mapSize, cells) {
+Robot::Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigned int sensors, float fov,
+             int movementType) :
+        m_map(mapSize, cells), m_movementType(movementType) {
 
     m_pos = pos;
     m_dir = sf::Vector2f(1, 0);
@@ -12,18 +13,19 @@ Robot::Robot(sf::Vector2f pos, sf::Vector2u mapSize, sf::Vector2u cells, unsigne
     while (angle <= fov / 2) {
         m_sensors.push_back({angle, {0, 0}});
         angle += fov / static_cast<float>(sensors);
+        m_sensors.back().updatePos(pos);
     }
 
     // Shape setzen
-    const float radius = 5;
-    m_shape.setRadius(radius);
+    const sf::Vector2f size = {5, 5};
+    m_shape.setSize(size);
     m_shape.setFillColor({0, 0, 255});
     m_shape.setOutlineColor({0, 0, 0});
     m_shape.setPosition(0, 0);
-    m_shape.setOrigin({radius / 2, radius / 2});
+    m_shape.setOrigin(size / 2.0f);
     m_shape.setPosition(m_pos);
 
-    chooseGoal();
+    chooseRandomGoal();
 }
 
 sf::Vector2f Robot::getDir() {
@@ -46,48 +48,21 @@ void Robot::updateSensorOrientations() {
     }
 }
 
-void Robot::updatePos() {
+void Robot::updatePos(const Map &map) {
 
-    if (std::pow(m_pos.x - m_goal.x, 2) + std::pow(m_pos.y - m_goal.y, 2) < 25 ||
-        !m_map.getCellAtReal(m_goal.x, m_goal.y)->isReachable()) {
-        m_runPathFindingOnUpdate = true;
-        chooseGoal();
-        return;
-    }
-
-    if (!m_path.empty()) {
-        unsigned int closestIndex = 0;
-        float record = std::pow(m_path.at(0).x - m_pos.x, 2) +
-                       std::pow(m_path.at(0).y - m_pos.y, 2);
-        for (unsigned int i = 1; i < m_path.size(); i++) {
-            const float d = std::pow(m_path.at(i).x - m_pos.x, 2) +
-                            std::pow(m_path.at(i).y - m_pos.y, 2);
-            if (d < record) {
-                closestIndex = i;
-                record = d;
-            }
-        }
-
-        sf::Vector2f dir;
-        if (closestIndex == 0) {
-            dir = m_path.at(closestIndex) - m_pos;
-        } else {
-            dir = m_path.at(closestIndex - 1) - m_pos;
-        }
-
-        dir /= std::sqrt(dir.x * dir.x + dir.y * dir.y);
-
-        const float dot = std::max(std::min(dir.x * m_dir.x + dir.y * m_dir.y, 1.0f), -1.0f);
-        const float angle = std::acos(dot);
-
-        rotate(angle);
-        move(0.25);
-    } else {
-        if (!m_map.getCellAtReal(m_pos.x, m_pos.y)->isTraversable()) {
-            move(1);
-        }
-        m_runPathFindingOnUpdate = true;
-    }
+    switch (m_movementType) {
+        case 0:
+            randomMovement(map);
+            break;
+        case 1:
+            randomPathMovement(map);
+            break;
+        case 2:
+            chosenPathMovement(map);
+            break;
+        default:
+            break;
+    };
 
     // update sprite
     m_shape.setPosition(m_pos);
@@ -98,7 +73,6 @@ void Robot::updateMap(const Map &map) {
     std::vector<Cell *> changedCells;
     std::vector<Wall> walls = map.getWalls();
 
-    sf::Vertex line[2];
     for (auto sensor: m_sensors) {
         const float d = sensor.measureDistance(walls);
         if (d < MAX_MEASURE_DIST) {
@@ -136,21 +110,13 @@ void Robot::updateMap(const Map &map) {
 
 void Robot::update(const Map &map) {
 
-    std::future<std::vector<sf::Vector2f>> futurePath;
-    if (m_runPathFindingOnUpdate) {
-        futurePath = std::async(&LabyrinthMap::aStar, &this->m_map, m_pos, m_goal);
-        futurePath.wait();
-    }
-
-    updatePos();
+    updatePos(map);
     updateMap(map);
 
-    if (futurePath.valid()) {
-
-        futurePath.wait();
-        m_path = futurePath.get();
+    if (m_runPathFindingOnUpdate) {
+        m_path = m_map.aStar(m_pos, m_goal);
         if (m_path.empty()) {
-            chooseGoal();
+            chooseRandomGoal();
         } else {
             m_runPathFindingOnUpdate = false;
         }
@@ -158,20 +124,54 @@ void Robot::update(const Map &map) {
 }
 
 
-void Robot::chooseGoal() {
+void Robot::chooseRandomGoal() {
     m_goal = {static_cast <float> (rand() * m_map.getSize().x) / static_cast <float> (RAND_MAX),
               static_cast <float> (rand() * m_map.getSize().y) / static_cast <float> (RAND_MAX)};
-};
+}
+
+
+void Robot::chooseSmartGoal() {
+    const float radiusOfCell = std::sqrt(m_map.getCellSize().x * m_map.getCellSize().x
+                                         + m_map.getCellSize().y * m_map.getCellSize().y);
+    sf::Vector2f finalGoal;
+    float record = 0;
+
+    for (int i = 1; i < m_map.getCellCount().x - 1; ++i) {
+        for (int j = 1; j < m_map.getCellCount().y - 1; ++j) {
+            auto cur = m_map.getCell(i, j);
+            if (!cur->isTraversable()) {
+                const sf::Vector2f directedVector = cur->getPosition() + cur->getSize() / 2.0f - m_pos;
+                const float magnitude = std::sqrt(directedVector.x * directedVector.x
+                                                  + directedVector.y * directedVector.y);
+                const sf::Vector2f newGoal = m_pos + directedVector + radiusOfCell * directedVector / magnitude;
+                if (newGoal.x < 0 || newGoal.y < 0 || newGoal.x >= m_map.getSize().x || newGoal.y >= m_map.getSize().y)
+                    continue;
+
+                if (magnitude < record) {
+                    continue;
+                }
+
+                cur = m_map.getCellAtReal(newGoal.x, newGoal.y);
+                if (cur->isReachable() && !cur->isChecked()) {
+                    record = magnitude;
+                    finalGoal = newGoal;
+                }
+            }
+        }
+    }
+    if (record < INFINITY) {
+        m_goal = finalGoal;
+        m_map.getCellAtReal(finalGoal.x, finalGoal.y)->check();
+        std::cout << "Chose smart goal\n";
+    } else {
+        chooseRandomGoal();
+    }
+}
 
 void Robot::move(float factor) {
     auto newPos = m_pos + m_dir * factor;
     if (newPos.x < 0 || newPos.x >= m_map.getCellSize().x * static_cast<float>(m_map.getSize().x) ||
         newPos.y < 0 || newPos.y >= m_map.getCellSize().y * static_cast<float>(m_map.getSize().y)) {
-        return;
-    }
-
-    if (!m_map.getCellAtReal(newPos.x, newPos.y)->isTraversable()) {
-        m_runPathFindingOnUpdate = true;
         return;
     }
 
@@ -189,6 +189,7 @@ void Robot::setPos(sf::Vector2f pos) {
 void Robot::rotate(float angle) {
     const float newAngle = std::atan2(m_dir.y, m_dir.x) + angle;
     m_dir = {std::cos(newAngle), std::sin(newAngle)};
+    m_shape.setRotation(newAngle * 180 / 3.14152);
     updateSensorOrientations();
 }
 
@@ -210,16 +211,132 @@ void Robot::draw(sf::RenderTarget &target, sf::RenderStates states) const {
     target.draw(path, m_path.size(), sf::LineStrip);
 }
 
-int Robot::calculateScore(LabyrinthMap &completeMap) {
-    const unsigned int size = std::min(m_map.getCellCount().x * m_map.getCellCount().y,
-                                       completeMap.getCellCount().x * completeMap.getCellCount().y);
+double Robot::calculateScore(LabyrinthMap &completeMap) {
+    const sf::Vector2u cells = {std::min(m_map.getCellCount().x, completeMap.getCellCount().x),
+                                std::min(m_map.getCellCount().y, completeMap.getCellCount().y)};
 
-    int score = 0;
-    for (int i = 0; i < size; ++i) {
-        if (m_map.getCell(i)->isReachable() == completeMap.getCell(i)->isReachable()) {
-            score += 1;
+    int revealed = 0;
+    int existing = 0;
+    for (int i = 0; i < cells.x; ++i) {
+        for (int j = 0; j < cells.y; ++j) {
+            if (!m_map.getCell(i, j)->isReachable()) {
+                revealed += 1;
+            }
+            if (!completeMap.getCell(i, j)->isReachable()){
+                existing += 1;
+            }
         }
     }
 
-    return score;
+    return static_cast<double>(revealed) / existing;
 }
+
+void Robot::randomMovement(const Map &map) {
+
+    std::default_random_engine randomEngine(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    std::uniform_int_distribution<int> distribution(0, 90);
+
+    auto toUsableAngle = [](int angle) {
+        return static_cast <float> (angle - 45) * 180.0f / 3.14152f;
+    };
+
+    float lowest = INFINITY;
+    for (auto sensor: m_sensors) {
+        const float d = sensor.measureDistance(map.getWalls());
+        if (lowest > d) {
+            lowest = d;
+        }
+    }
+
+    if (lowest > 0.3) {
+        move(0.25);
+    }
+
+    if (lowest < 5) {
+        rotate(toUsableAngle(distribution(randomEngine)));
+    }
+}
+
+void Robot::randomPathMovement(const Map &map) {
+    if (std::pow(m_pos.x - m_goal.x, 2) + std::pow(m_pos.y - m_goal.y, 2) < 25 ||
+        !m_map.getCellAtReal(m_goal.x, m_goal.y)->isReachable()) {
+        m_runPathFindingOnUpdate = true;
+        chooseRandomGoal();
+        return;
+    }
+
+    if (!m_path.empty()) {
+        unsigned int closestIndex = 0;
+        float record = std::pow(m_path.at(0).x - m_pos.x, 2) +
+                       std::pow(m_path.at(0).y - m_pos.y, 2);
+        for (unsigned int i = 1; i < m_path.size(); i++) {
+            const float d = std::pow(m_path.at(i).x - m_pos.x, 2) +
+                            std::pow(m_path.at(i).y - m_pos.y, 2);
+            if (d < record) {
+                closestIndex = i;
+                record = d;
+            }
+        }
+
+        sf::Vector2f dir;
+        if (closestIndex == 0) {
+            dir = m_path.at(closestIndex) - m_pos;
+        } else {
+            dir = m_path.at(closestIndex - 1) - m_pos;
+        }
+
+        dir /= std::sqrt(dir.x * dir.x + dir.y * dir.y);
+
+        const float dot = std::max(std::min(dir.x * m_dir.x + dir.y * m_dir.y, 1.0f), -1.0f);
+        const float angle = std::acos(dot);
+
+        rotate(angle);
+        move(0.25);
+    } else {
+        randomMovement(map);
+        m_runPathFindingOnUpdate = true;
+    }
+}
+
+void Robot::chosenPathMovement(const Map &map) {
+    if (std::pow(m_pos.x - m_goal.x, 2) + std::pow(m_pos.y - m_goal.y, 2) < 25 ||
+        !m_map.getCellAtReal(m_goal.x, m_goal.y)->isReachable()) {
+        m_runPathFindingOnUpdate = true;
+        chooseSmartGoal();
+        return;
+    }
+    m_map.getCellAtReal(m_pos.x, m_pos.y)->check();
+
+    if (!m_path.empty()) {
+        unsigned int closestIndex = 0;
+        float record = std::pow(m_path.at(0).x - m_pos.x, 2) +
+                       std::pow(m_path.at(0).y - m_pos.y, 2);
+        for (unsigned int i = 1; i < m_path.size(); i++) {
+            const float d = std::pow(m_path.at(i).x - m_pos.x, 2) +
+                            std::pow(m_path.at(i).y - m_pos.y, 2);
+            if (d < record) {
+                closestIndex = i;
+                record = d;
+            }
+        }
+
+        sf::Vector2f dir;
+        if (closestIndex == 0) {
+            dir = m_path.at(closestIndex) - m_pos;
+        } else {
+            dir = m_path.at(closestIndex - 1) - m_pos;
+        }
+
+        dir /= std::sqrt(dir.x * dir.x + dir.y * dir.y);
+
+        const float dot = std::max(std::min(dir.x * m_dir.x + dir.y * m_dir.y, 1.0f), -1.0f);
+        const float angle = std::acos(dot);
+
+        rotate(angle);
+        move(0.25);
+    } else {
+        randomMovement(map);
+        m_runPathFindingOnUpdate = true;
+    }
+}
+

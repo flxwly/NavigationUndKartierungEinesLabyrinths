@@ -61,3 +61,11 @@ void Cell::deFlag() {
 bool Cell::isFlagged() const {
     return m_flag;
 }
+
+void Cell::check() {
+    m_checked = true;
+}
+
+bool Cell::isChecked() const {
+    return m_checked;
+}

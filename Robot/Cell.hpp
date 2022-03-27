@@ -10,6 +10,8 @@ public:
     static sf::Color reachableColor;
     static sf::Color nonReachableColor;
 
+    Cell() = default;
+
     Cell(sf::Vector2f pos, sf::Vector2f size, bool isTraversable);
 
     void makeTraversable();
@@ -24,17 +26,20 @@ public:
 
     void deFlag();
 
+    void check();
+
     bool isFlagged() const;
 
     bool isReachable() const;
 
     bool isTraversable() const;
 
+    bool isChecked() const;
+
 private:
 
-    // TODO: Implement flood fill to see what is reachable and what not
-    bool m_flag;
-    bool m_isTraversable, m_isReachable;
+    bool m_flag = false, m_checked = false;
+    bool m_isTraversable = false, m_isReachable = false;
 };
 
 

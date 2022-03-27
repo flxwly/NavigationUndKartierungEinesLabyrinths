@@ -80,4 +80,4 @@ void Map::draw(sf::RenderTarget &target, sf::RenderStates states) const {
 
         target.draw(line, 2, sf::Lines);
     }
-};
+}

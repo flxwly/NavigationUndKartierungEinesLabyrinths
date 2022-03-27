@@ -6,6 +6,7 @@
 #include <cmath>
 #include <queue>
 #include <iostream>
+#include <list>
 
 #include "Cell.hpp"
 
@@ -14,8 +15,6 @@ class LabyrinthMap : public sf::Drawable {
 
 public:
     LabyrinthMap(sf::Vector2u size, sf::Vector2u cells);
-
-    Cell *getCell(unsigned int index);
 
     Cell *getCell(unsigned int x, unsigned int y);
 
@@ -34,12 +33,14 @@ private:
     sf::Vector2u m_size, m_cells;
     sf::Vector2f m_cellSize;
 
-    std::vector<Cell> m_content;
+    std::vector<std::vector<Cell>> m_content;
 
     void draw(sf::RenderTarget &target, sf::RenderStates states) const override {
-        for (const auto &cell: this->m_content) {
-            if (!cell.isTraversable() || !cell.isReachable())
-                target.draw(cell, states);
+        for (const auto &row: this->m_content) {
+            for (const auto &cell : row) {
+                if (!cell.isTraversable() || !cell.isReachable() || cell.isChecked())
+                    target.draw(cell, states);
+            }
         }
     };
 };

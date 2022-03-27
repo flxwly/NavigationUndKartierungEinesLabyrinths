@@ -40,23 +40,26 @@ float LaserRangeSensor::measureDistance(const std::vector<Wall> &walls) const {
 
         // Weil nicht durch 0 geteilt werden kann und der Nenner für s und t gleich ist.
         const float den = y3 * (x1 - x0) - x3 * (y1 - y0);
-        if (den == 0) {
+        const float sNom = (x3 * (y0 - y2) - y3 * (x0 - x2));
+        const float tNom = ((y1 - y0) * (x2 - x0) - (y2 - y0) * (x1 - x0));
+
+        const bool tCheck = (tNom >= 0 && den > 0) || (tNom <= 0 && den < 0);
+        const bool sCheck = ((sNom >= 0 && den > 0) && (sNom <= den)) || ((sNom <= 0 && den < 0) && (sNom >= den));
+
+        if (den == 0 || !sCheck || !tCheck) {
             continue;
         }
 
-        const float s = (x3 * (y0 - y2) - y3 * (x0 - x2)) / den;
         const float t = ((y1 - y0) * (x2 - x0) - (y2 - y0) * (x1 - x0)) / den;
-        if (0 <= s && s <= 1 && 0 <= t) {
-            const float x = x2 + t * x3;
-            const float y = y2 + t * y3;
-            const float d = (x - x2) * (x - x2) + (y - y2) * (y - y2);
-            if (d < record) {
-                record = d;
-            }
+        const float x = x2 + t * x3;
+        const float y = y2 + t * y3;
+        const float d = (x - x2) * (x - x2) + (y - y2) * (y - y2);
+        if (d < record) {
+            record = d;
         }
+
     }
     return std::sqrt(record);
 }
-
 
 

@@ -1,9 +1,8 @@
-#define _USE_MATH_DEFINES
-
 #include <iostream>
 #include <SFML/Graphics.hpp>
-#include <cmath>
 #include <chrono>
+#include <future>
+#include <fstream>
 #include "Robot/Robot.hpp"
 
 bool isInside(Wall wall, Cell *cell) {
@@ -11,8 +10,10 @@ bool isInside(Wall wall, Cell *cell) {
     const sf::Vector2f tr = {tl.x + cell->getSize().x, tl.y};
     const sf::Vector2f bl = {tl.x, tl.y + cell->getSize().y};
 
-    const bool aIsInside = wall.getA().x >= tl.x && tr.x >= wall.getA().x && wall.getA().y >= tl.y && bl.y >= wall.getA().y;
-    const bool bIsInside = wall.getB().x >= tl.x && tr.x >= wall.getB().x && wall.getB().y >= tl.y && bl.y >= wall.getB().y;
+    const bool aIsInside =
+            wall.getA().x >= tl.x && tr.x >= wall.getA().x && wall.getA().y >= tl.y && bl.y >= wall.getA().y;
+    const bool bIsInside =
+            wall.getB().x >= tl.x && tr.x >= wall.getB().x && wall.getB().y >= tl.y && bl.y >= wall.getB().y;
     return aIsInside || bIsInside;
 }
 
@@ -46,23 +47,12 @@ bool isIntersecting(Wall wall, Cell *cell) {
         const float sNom = (x0 - x2) * (y2 - y3) - (y0 - y2) * (x2 - x3);
         const float tNom = (x0 - x2) * (y0 - y1) - (y0 - y2) * (x0 - x1);
 
-        if (den == 0) {
-            continue;
-        }
+        const bool tCheck = ((tNom >= 0 && den > 0) && (tNom <= den)) || ((tNom <= 0 && den < 0) && (tNom >= den));
+        const bool sCheck = ((sNom >= 0 && den > 0) && (sNom <= den)) || ((sNom <= 0 && den < 0) && (sNom >= den));
 
-        const float t = tNom / den;
-        const float s = sNom / den;
-
-        if (0 <= t && t <= 1 && 0 <= s && s <= 1) {
+        if (den != 0 && tCheck && sCheck) {
             return true;
         }
-
-//        const bool sCondition = sNom == 0 || (sNom <= den && ((sNom < 0 && den < 0) || (sNom > 0 && den > 0)));
-//        const bool tCondition = tNom == 0 || (tNom <= den && ((tNom < 0 && den < 0) || (tNom > 0 && den > 0)));
-//
-//        if (sCondition && tCondition) {
-//            return true;
-//        }
     }
     return false;
 }
@@ -70,15 +60,15 @@ bool isIntersecting(Wall wall, Cell *cell) {
 LabyrinthMap createCompleteMap(sf::Vector2u size, sf::Vector2u cells, sf::Vector2f robotPos, Map &map) {
 
     LabyrinthMap completeMap(size, cells);
-    unsigned int cellCount = cells.x * cells.y;
 
-
-    for (int i = 0; i < cellCount; ++i) {
-        Cell *cur = completeMap.getCell(i);
-        for (auto wall: map.getWalls()) {
-            if (isIntersecting(wall, cur) || isInside(wall, cur)) {
-                cur->makeNonTraversable();
-                break;
+    for (int i = 0; i < cells.x; ++i) {
+        for (int j = 0; j < cells.y; ++j) {
+            Cell *cur = completeMap.getCell(i, j);
+            for (auto wall: map.getWalls()) {
+                if (isIntersecting(wall, cur) || isInside(wall, cur)) {
+                    cur->makeNonTraversable();
+                    break;
+                }
             }
         }
     }
@@ -87,62 +77,150 @@ LabyrinthMap createCompleteMap(sf::Vector2u size, sf::Vector2u cells, sf::Vector
     return completeMap;
 }
 
-int main() {
+void
+runVisible(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &robots, LabyrinthMap &completeMap) {
 
-    const sf::Vector2u winSize = {1080, 720};
-    const sf::Vector2u cells = {192, 108};
-    const unsigned int winWidth = 1080;
-    const unsigned int winHeight = 720;
+    sf::RenderWindow window(sf::VideoMode(map.getSize().x, map.getSize().y),
+                            "Navigation und Kartierung eines Labyrinths.");
+    window.setVerticalSyncEnabled(true);
 
-    sf::RenderWindow window(sf::VideoMode(winWidth, winHeight), "Navigation und Kartierung eines Labyrinths.");
-    //window.setFramerateLimit(1);
-    //window.setVerticalSyncEnabled(true);
+    int cycles = 0;
+    unsigned int robotToDraw = 0;
 
-    Robot robot = Robot({winWidth / 2, winHeight / 2}, winSize, cells, 20, M_PI / 4);
-
-    srand(time(NULL));
-    Map map = Map({winWidth, winHeight}, {50, 50}, 1, 3, 0.1);
-
-    // Eine im vorraus berechnete Karte, die alle nicht erreichbaren Felder markiert.
-    // Hat ein Roboter alle nicht erreichbaren gefunden kann eine neue Karte generiert werden. Und die gebrauchte Zahl
-    // an Zyklen kann gespeichert werden.
-    LabyrinthMap completedMap = createCompleteMap(winSize, cells, robot.getPos(), map);
-
-    const int updatesPerFrame = 20;
-    auto lastUpdateTime = std::chrono::high_resolution_clock::now();
-
-    long cycles = 0;
     while (window.isOpen()) {
+        for (int i = 0; i < 10; ++i) {
+            for (int j = 0; j < robots.size(); ++j) {
+
+                if (cycles % 20 == 0) {
+                    score->at(j).push_back(robots.at(j).calculateScore(completeMap));
+                }
+                robots.at(j).update(map);
+            }
+            cycles++;
+
+        }
         window.clear({255, 255, 255});
-
         window.draw(map);
-        //window.draw(completedMap);
+        window.draw(robots.at(robotToDraw));
 
-        for (int i = 0; i < updatesPerFrame; ++i) {
-            robot.update(map);
-        }
-
-        int score = robot.calculateScore(completedMap);
-        if (static_cast<double> (score) / (cells.x * cells.y) > 0.95) {
-            std::cout << "Took " << updatesPerFrame * cycles << " cycles...\n";
-            return 0;
-        }
-
-        window.draw(robot);
-
-        // check all the window's events that were triggered since the last iteration of the loop
-        sf::Event event;
+        sf::Event event{};
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::MouseButtonPressed) {
-                robot.setPos(sf::Vector2f(event.mouseButton.x, event.mouseButton.y));
+                robotToDraw = (robotToDraw + 1) % robots.size();
             }
-            // "close requested" event: we close the window
-            if (event.type == sf::Event::Closed)
+            if (event.type == sf::Event::Closed || cycles >= 10000) {
                 window.close();
+            }
         }
+
         window.display();
+    }
+    window.close();
+}
+
+void runSim(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &robots, LabyrinthMap &completeMap) {
+    int cycles = 0;
+    const int maxCycles = 50000;
+    while (true) {
+        for (int j = 0; j < robots.size(); ++j) {
+
+            if (cycles % 20 == 0) {
+                score->at(j).push_back(robots.at(j).calculateScore(completeMap));
+            }
+            robots.at(j).update(map);
+        }
+        switch (cycles) {
+            case maxCycles / 5:
+                std::cout << "Done 20%...\n";
+                break;
+            case maxCycles / 5 * 2:
+                std::cout << "Done 40%...\n";
+                break;
+            case maxCycles / 5 * 3:
+                std::cout << "Done 60%...\n";
+                break;
+            case maxCycles / 5 * 4:
+                std::cout << "Done 80%...\n";
+                break;
+            default:
+                if (cycles >= maxCycles) {
+                    return;
+                }
+                break;
+        }
+
         cycles++;
     }
-
-    return 0;
 }
+
+std::vector<std::list<double>> runSimulationA() {
+
+    const sf::Vector2u mapSize = {1080, 720};
+    const sf::Vector2u cells = {192, 108};
+    const sf::Vector2f startPos = sf::Vector2f(mapSize.x / 2 + 1, mapSize.x / 2 + 1);
+
+    const sf::Vector2u gridWalls = {35, 35};
+    const float gridWallFrequency = 0.3;
+    const unsigned int randomWalls = 1;
+    const unsigned int randomBoxes = 1;
+
+    Map map = Map(mapSize, gridWalls, randomWalls, randomBoxes, gridWallFrequency);
+    std::vector<Robot> robots = {
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 0),
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 1),
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 2)
+    };
+
+    std::vector<std::list<double>> score(robots.size());
+
+    LabyrinthMap completedMap = createCompleteMap(mapSize, cells, startPos, map);
+
+    runSim(&score, map, robots, completedMap);
+    return score;
+}
+
+int main() {
+    srand(time(nullptr));
+
+    const int threads = 8;
+    const int runTimes = 32;
+
+    std::vector<std::vector<std::list<double>>> globalScores;
+    std::vector<std::future<std::vector<std::list<double>>>> runs;
+    runs.reserve(threads);
+    for (int i = 0; i < threads; ++i) {
+        runs.emplace_back(std::async(&runSimulationA));
+    }
+
+    int completedRuns = 0;
+    while (runTimes > completedRuns) {
+        for (auto &run: runs) {
+            if (run.valid()) {
+                globalScores.push_back(std::move(run.get()));
+                completedRuns += 1;
+                std::swap(run, runs.back());
+                runs.pop_back();
+                if (completedRuns + runs.size() < runTimes) {
+                    runs.push_back(std::async(&runSimulationA));
+                    std::cout << "Completed one run...\n";
+                }
+            }
+        }
+    }
+
+    std::ofstream outFile("result.txt");
+    for (const auto &sim : globalScores) {
+        for (int i = 0; i < sim.at(0).size(); ++i) {
+            outFile << i * 20 << "\t";
+        }
+        outFile << "\n";
+        for (const auto &run: sim) {
+            for (const auto &score: run) {
+                outFile << score << "\t";
+            }
+            outFile << "\n";
+        }
+        outFile << "\n";
+    }
+}
+
