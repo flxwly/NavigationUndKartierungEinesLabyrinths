@@ -84,6 +84,19 @@ runVisible(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &
                             "Navigation und Kartierung eines Labyrinths.");
     window.setVerticalSyncEnabled(true);
 
+    sf::Font font;
+    if (!font.loadFromFile("arial.ttf")) {
+        throw std::invalid_argument("Font konnte nicht geladen werden");
+    }
+    sf::Text text;
+    text.setFont(font);
+    text.setPosition(10, 10);
+    text.setCharacterSize(16);
+    text.setString("Es wird Roboter 1 gezeigt.");
+    text.setStyle(sf::Text::Bold);
+    text.setFillColor(sf::Color::Red);
+
+
     int cycles = 0;
     unsigned int robotToDraw = 0;
 
@@ -102,13 +115,15 @@ runVisible(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &
         window.clear({255, 255, 255});
         window.draw(map);
         window.draw(robots.at(robotToDraw));
+        window.draw(text);
 
         sf::Event event{};
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::MouseButtonPressed) {
                 robotToDraw = (robotToDraw + 1) % robots.size();
+                text.setString("Es wird Roboter " + std::to_string(robotToDraw + 1) + " gezeigt.");
             }
-            if (event.type == sf::Event::Closed || cycles >= 10000) {
+            if (event.type == sf::Event::Closed) {
                 window.close();
             }
         }
@@ -155,7 +170,7 @@ void runSim(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> 
 
 std::vector<std::list<double>> runSimulationA() {
 
-    const sf::Vector2u mapSize = {1080, 720};
+    const sf::Vector2u mapSize = {1920, 1080};
     const sf::Vector2u cells = {192, 108};
     const sf::Vector2f startPos = sf::Vector2f(mapSize.x / 2 + 1, mapSize.x / 2 + 1);
 
@@ -175,20 +190,20 @@ std::vector<std::list<double>> runSimulationA() {
 
     LabyrinthMap completedMap = createCompleteMap(mapSize, cells, startPos, map);
 
-    runSim(&score, map, robots, completedMap);
+    runVisible(&score, map, robots, completedMap);
     return score;
 }
 
 int main() {
     srand(time(nullptr));
 
-    const int threads = 8;
-    const int runTimes = 32;
+    const int threads = 1;
+    const int runTimes = 1;
 
     std::vector<std::vector<std::list<double>>> globalScores;
     std::vector<std::future<std::vector<std::list<double>>>> runs;
     runs.reserve(threads);
-    for (int i = 0; i < threads; ++i) {
+    for (int i = 0; i < std::min(threads, runTimes); ++i) {
         runs.emplace_back(std::async(&runSimulationA));
     }
 
