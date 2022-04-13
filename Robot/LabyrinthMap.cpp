@@ -102,16 +102,15 @@ std::vector<sf::Vector2f> LabyrinthMap::aStar(sf::Vector2f start, sf::Vector2f e
             }
 
 
-            if (d.at(v.x).at(v.y) > d.at(u.x).at(u.y) + heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition())) {
+            if (d.at(v.x).at(v.y) >
+                d.at(u.x).at(u.y) + heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition())) {
                 p.at(v.x).at(v.y) = u;
 
-                if (getCell(u.x, u.y)->isChecked()) {
-                    d.at(v.x).at(v.y) = d.at(u.x).at(u.y) + 2 * heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition());
-                } else {
-                    d.at(v.x).at(v.y) = d.at(u.x).at(u.y) + heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition());
-                }
+                d.at(v.x).at(v.y) = d.at(u.x).at(u.y) +
+                                    heuristic(getCell(u.x, u.y)->getPosition(), getCell(v.x, v.y)->getPosition());
 
-                pq.push(std::make_tuple(d.at(v.x).at(v.y) + heuristic(getCell(v.x, v.y)->getPosition(), getCell(endIdx.x, endIdx.y)->getPosition()),
+                pq.push(std::make_tuple(d.at(v.x).at(v.y) + heuristic(getCell(v.x, v.y)->getPosition(),
+                                                                      getCell(endIdx.x, endIdx.y)->getPosition()),
                                         v));
             }
 

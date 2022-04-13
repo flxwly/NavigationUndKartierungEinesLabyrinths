@@ -78,10 +78,10 @@ LabyrinthMap createCompleteMap(sf::Vector2u size, sf::Vector2u cells, sf::Vector
 }
 
 void
-runVisible(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &robots, LabyrinthMap &completeMap) {
+runVisible(Map &map, std::vector<Robot> &robots, LabyrinthMap &completeMap, int scoreInterval) {
 
     sf::RenderWindow window(sf::VideoMode(map.getSize().x, map.getSize().y),
-                            "Navigation und Kartierung eines Labyrinths.");
+                            "Kartierung und Untersuchung eines Labyrinths.");
     window.setVerticalSyncEnabled(true);
 
     sf::Font font;
@@ -96,25 +96,37 @@ runVisible(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &
     text.setStyle(sf::Text::Bold);
     text.setFillColor(sf::Color::Red);
 
+    sf::Text score;
+    score.setFont(font);
+    score.setPosition(10, 30);
+    score.setCharacterSize(16);
+    score.setString("Score: 0");
+    score.setStyle(sf::Text::Bold);
+    score.setFillColor(sf::Color::Red);
+
 
     int cycles = 0;
+    int cyclesPerFrame = 10;
     unsigned int robotToDraw = 0;
 
     while (window.isOpen()) {
-        for (int i = 0; i < 10; ++i) {
-            for (int j = 0; j < robots.size(); ++j) {
+        for (int i = 0; i < cyclesPerFrame; ++i) {
+            std::for_each(robots.begin(), robots.end(), [&map](auto& item) {
+                item.update(map);
+            });
 
-                if (cycles % 20 == 0) {
-                    score->at(j).push_back(robots.at(j).calculateScore(completeMap));
-                }
-                robots.at(j).update(map);
+            if (cycles % scoreInterval == 0) {
+                std::for_each(robots.begin(), robots.end(), [&completeMap](auto& item) {
+                    item.calculateScore(completeMap);
+                });
             }
-            cycles++;
 
+            cycles += 1;
         }
         window.clear({255, 255, 255});
         window.draw(map);
         window.draw(robots.at(robotToDraw));
+        score.setString("Score: " + std::to_string(robots.at(robotToDraw).getScore().back()));
         window.draw(text);
 
         sf::Event event{};
@@ -133,17 +145,21 @@ runVisible(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &
     window.close();
 }
 
-void runSim(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> &robots, LabyrinthMap &completeMap) {
+void runSim(Map &map, std::vector<Robot> &robots, LabyrinthMap &completeMap, int scoreInterval) {
     int cycles = 0;
-    const int maxCycles = 50000;
+    const int maxCycles = 10000;
     while (true) {
-        for (int j = 0; j < robots.size(); ++j) {
 
-            if (cycles % 20 == 0) {
-                score->at(j).push_back(robots.at(j).calculateScore(completeMap));
-            }
-            robots.at(j).update(map);
+        std::for_each(robots.begin(), robots.end(), [&map](auto& item) {
+            item.update(map);
+        });
+
+        if (cycles % scoreInterval == 0) {
+            std::for_each(robots.begin(), robots.end(), [&completeMap](auto& item) {
+                item.calculateScore(completeMap);
+            });
         }
+
         switch (cycles) {
             case maxCycles / 5:
                 std::cout << "Done 20%...\n";
@@ -168,11 +184,33 @@ void runSim(std::vector<std::list<double>> *score, Map &map, std::vector<Robot> 
     }
 }
 
-std::vector<std::list<double>> runSimulationA() {
+std::string getMovementTypeName(int movementType) {
+    switch (movementType) {
+        case 0:
+            return "Zufällige Bewegung";
+        case 1:
+            return "Zufälliges Ziel";
+        case 2:
+            return "Eigener Algorithmus";
+        case 3:
+            return "Zirkuläre Bewegung ohne Abstand";
+        case 4:
+            return "Zirkuläre Bewegung mit 4 Zellen Abstand";
+        case 5:
+            return "Zirkuläre Bewegung mit 16 Zellen Abstand";
+        case 6:
+            return "Zirkuläre Bewegung mit angepasstem Abstand";
+        default:
+            return "Undefiniertes Bewegungsmuster";
 
-    const sf::Vector2u mapSize = {1920, 1080};
-    const sf::Vector2u cells = {192, 108};
-    const sf::Vector2f startPos = sf::Vector2f(mapSize.x / 2 + 1, mapSize.x / 2 + 1);
+    }
+}
+
+std::vector<std::pair<std::string, std::list<double>>> runSimulationA() {
+
+    const sf::Vector2u mapSize = {1080, 720};
+    const sf::Vector2u cells = {108, 72};
+    const sf::Vector2f startPos = sf::Vector2f(mapSize.x / 2, mapSize.y / 2);
 
     const sf::Vector2u gridWalls = {35, 35};
     const float gridWallFrequency = 0.3;
@@ -181,28 +219,38 @@ std::vector<std::list<double>> runSimulationA() {
 
     Map map = Map(mapSize, gridWalls, randomWalls, randomBoxes, gridWallFrequency);
     std::vector<Robot> robots = {
-            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 0),
             Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 1),
-            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 2)
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 2),
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 3),
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 4),
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 5),
+            Robot(startPos, mapSize, cells, 12, 3.14152 / 2, 6),
     };
 
-    std::vector<std::list<double>> score(robots.size());
 
     LabyrinthMap completedMap = createCompleteMap(mapSize, cells, startPos, map);
 
-    runVisible(&score, map, robots, completedMap);
+    runVisible(map, robots, completedMap, 100);
+
+    std::vector<std::pair<std::string, std::list<double>>> score = {
+
+    };
+    score.reserve(robots.size());
+    for (const auto& bot: robots) {
+        score.emplace_back(getMovementTypeName(bot.getMovementType()), bot.getScore());
+    }
     return score;
 }
 
 int main() {
-    srand(time(nullptr));
+    srand(100);
 
     const int threads = 1;
     const int runTimes = 1;
 
-    std::vector<std::vector<std::list<double>>> globalScores;
-    std::vector<std::future<std::vector<std::list<double>>>> runs;
-    runs.reserve(threads);
+    std::vector<std::vector<std::pair<std::string, std::list<double>>>> globalScores;
+    std::vector<std::future<std::vector<std::pair<std::string, std::list<double>>>>> runs;
+    runs.reserve(std::min(threads, runTimes));
     for (int i = 0; i < std::min(threads, runTimes); ++i) {
         runs.emplace_back(std::async(&runSimulationA));
     }
@@ -211,13 +259,13 @@ int main() {
     while (runTimes > completedRuns) {
         for (auto &run: runs) {
             if (run.valid()) {
+                std::cout << "Completed run!\n";
                 globalScores.push_back(std::move(run.get()));
                 completedRuns += 1;
                 std::swap(run, runs.back());
                 runs.pop_back();
                 if (completedRuns + runs.size() < runTimes) {
                     runs.push_back(std::async(&runSimulationA));
-                    std::cout << "Completed one run...\n";
                 }
             }
         }
@@ -225,12 +273,14 @@ int main() {
 
     std::ofstream outFile("result.txt");
     for (const auto &sim : globalScores) {
-        for (int i = 0; i < sim.at(0).size(); ++i) {
-            outFile << i * 20 << "\t";
+        outFile << "Zyklen\t";
+        for (int i = 0; i < sim.at(0).second.size() - 1; ++i) {
+            outFile << std::to_string(i * 100) << "\t";
         }
         outFile << "\n";
         for (const auto &run: sim) {
-            for (const auto &score: run) {
+            outFile << run.first << "\t";
+            for (const auto &score: run.second) {
                 outFile << score << "\t";
             }
             outFile << "\n";

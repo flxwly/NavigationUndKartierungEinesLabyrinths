@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(NavigationUndKartierungEinesLabyrinths)
 
+set(CMAKE_CXX_STANDARD 17)
+
 ## If you want to link SFML statically
 # set(SFML_STATIC_LIBRARIES TRUE)
 
